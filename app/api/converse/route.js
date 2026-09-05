@@ -17,6 +17,11 @@ function openaiClient() {
   return _openai;
 }
 
+// Portuguese means Brazilian Portuguese in this app.
+function promptLanguage(name) {
+  return name === "Portuguese" ? "Brazilian Portuguese (pt-BR)" : name;
+}
+
 const LANG_NAMES = new Intl.DisplayNames(["en"], { type: "language" });
 
 function languageName(code) {
@@ -114,10 +119,10 @@ export async function POST(request) {
           role: "system",
           content:
             `You are interpreting a live back-and-forth conversation. Translate the ` +
-            `speaker's message into ${targetLang}. Output ONLY the translation — no ` +
+            `speaker's message into ${promptLanguage(targetLang)}. Output ONLY the translation — no ` +
             `quotes, commentary, or romanization. Keep their tone and register: ` +
             `translate casual speech casually. Preserve names, numbers and units. ` +
-            `If it is already in ${targetLang}, return it unchanged.`,
+            `If it is already in ${promptLanguage(targetLang)}, return it unchanged.`,
         },
         { role: "user", content: sourceText },
       ],

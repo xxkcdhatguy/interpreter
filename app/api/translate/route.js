@@ -17,6 +17,11 @@ function openaiClient() {
   return _openai;
 }
 
+// Portuguese means Brazilian Portuguese in this app.
+function promptLanguage(name) {
+  return name === "Portuguese" ? "Brazilian Portuguese (pt-BR)" : name;
+}
+
 // Language name lookup for the ISO codes Whisper returns.
 const LANG_NAMES = new Intl.DisplayNames(["en"], { type: "language" });
 
@@ -103,10 +108,10 @@ export async function POST(request) {
           {
             role: "system",
             content:
-              `You are a live conversation interpreter. Translate the user's message into ${targetLang}. ` +
+              `You are a live conversation interpreter. Translate the user's message into ${promptLanguage(targetLang)}. ` +
               `Output ONLY the translation, with no quotes, no commentary, no romanization. ` +
               `Keep the speaker's tone and register — translate casual speech casually. ` +
-              `Preserve names, numbers and units exactly. If the text is already in ${targetLang}, return it unchanged.`,
+              `Preserve names, numbers and units exactly. If the text is already in ${promptLanguage(targetLang)}, return it unchanged.`,
           },
           { role: "user", content: sourceText },
         ],

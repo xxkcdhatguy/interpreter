@@ -15,6 +15,11 @@ function openaiClient() {
   return _openai;
 }
 
+// Portuguese means Brazilian Portuguese in this app.
+function promptLanguage(name) {
+  return name === "Portuguese" ? "Brazilian Portuguese (pt-BR)" : name;
+}
+
 /**
  * Re-translate an existing turn into another language, without re-recording.
  * Reuses the cloned voice from the original turn when one is supplied.
@@ -45,10 +50,10 @@ export async function POST(request) {
         {
           role: "system",
           content:
-            `You are a live conversation interpreter. Translate the user's message into ${targetLang}. ` +
+            `You are a live conversation interpreter. Translate the user's message into ${promptLanguage(targetLang)}. ` +
             `Output ONLY the translation, with no quotes, no commentary, no romanization. ` +
             `Keep the speaker's tone and register. Preserve names, numbers and units exactly. ` +
-            `If the text is already in ${targetLang}, return it unchanged.`,
+            `If the text is already in ${promptLanguage(targetLang)}, return it unchanged.`,
         },
         { role: "user", content: sourceText },
       ],

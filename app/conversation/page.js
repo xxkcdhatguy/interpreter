@@ -24,6 +24,7 @@ export default function Conversation() {
   const startedAtRef = useRef(0);
   const tickRef = useRef(null);
   const audioRef = useRef(null);
+  const unlockedRef = useRef(false);
   const stopRef = useRef(null);
 
   // Each side keeps its own cloned voice, so only the first turn per person
@@ -58,6 +59,30 @@ export default function Conversation() {
       if (tickRef.current) clearInterval(tickRef.current);
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
+  }, []);
+
+  // Safari/iOS block programmatic playback until the element has played once
+  // from a user gesture. Prime it during the press.
+  const unlockAudio = useCallback(() => {
+    if (unlockedRef.current || !audioRef.current) return;
+    const el = audioRef.current;
+    el.muted = true;
+    el.src =
+      "data:audio/mp3;base64,//MkxAAHiAICWABIAGBgcAAAAA" +
+      "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    const pr = el.play();
+    if (pr?.then) {
+      pr.then(() => {
+        el.pause();
+        el.muted = false;
+        unlockedRef.current = true;
+      }).catch(() => {
+        el.muted = false;
+      });
+    } else {
+      el.muted = false;
+      unlockedRef.current = true;
+    }
   }, []);
 
   const send = useCallback(async (blob, forcedSide) => {
@@ -100,7 +125,9 @@ export default function Conversation() {
       setStatus("idle");
       if (data.audio && audioRef.current) {
         audioRef.current.src = data.audio;
-        audioRef.current.play().catch(() => {});
+        audioRef.current.play().catch(() => {
+          setError("Playback blocked \u2014 tap a button and try again.");
+        });
       }
     } catch {
       if (tickRef.current) {
@@ -228,7 +255,10 @@ export default function Conversation() {
         status={status}
         clone={clone}
         elapsed={elapsed}
-        onStart={start}
+        onStart={(side) => {
+          unlockAudio();
+          start(side);
+        }}
         onStop={stop}
         onLangChange={() => {
           voiceB.current = null;
@@ -276,7 +306,10 @@ export default function Conversation() {
         status={status}
         clone={clone}
         elapsed={elapsed}
-        onStart={start}
+        onStart={(side) => {
+          unlockAudio();
+          start(side);
+        }}
         onStop={stop}
         onLangChange={() => {
           voiceA.current = null;

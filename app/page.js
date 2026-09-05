@@ -20,12 +20,15 @@ export default function Home() {
   const [activeId, setActiveId] = useState("s1");
   const [alt, setAlt] = useState(null); // { target, translated } re-translation
   const [altBusy, setAltBusy] = useState(null); // language being fetched
+  const [typed, setTyped] = useState("");
+  const [saying, setSaying] = useState(false);
 
   const recorderRef = useRef(null);
   const chunksRef = useRef([]);
   const streamRef = useRef(null);
   const startedAtRef = useRef(0);
   const audioRef = useRef(null);
+  const unlockedRef = useRef(false);
   const tickRef = useRef(null);
   const targetRef = useRef("English");
   const stopRef = useRef(null);
@@ -59,6 +62,30 @@ export default function Home() {
       if (tickRef.current) clearInterval(tickRef.current);
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
+  }, []);
+
+  // Safari/iOS block programmatic playback unless the element has already
+  // played once from a user gesture. Prime it during the press.
+  const unlockAudio = useCallback(() => {
+    if (unlockedRef.current || !audioRef.current) return;
+    const el = audioRef.current;
+    el.muted = true;
+    el.src =
+      "data:audio/mp3;base64,//MkxAAHiAICWABIAGBgcAAAAA" +
+      "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    const pr = el.play();
+    if (pr?.then) {
+      pr.then(() => {
+        el.pause();
+        el.muted = false;
+        unlockedRef.current = true;
+      }).catch(() => {
+        el.muted = false;
+      });
+    } else {
+      el.muted = false;
+      unlockedRef.current = true;
+    }
   }, []);
 
   const send = useCallback(async (blob, targetLang, useClone) => {
@@ -104,7 +131,7 @@ export default function Home() {
       if (data.audio && audioRef.current) {
         audioRef.current.src = data.audio;
         audioRef.current.play().catch(() => {
-          /* autoplay blocked; the Replay button covers it */
+          setError("Tap \u21bb Play again to hear it.");
         });
       }
     } catch {
@@ -275,6 +302,38 @@ export default function Home() {
     },
     []
   );
+
+  // Speak typed text verbatim in the selected speaker's saved voice.
+  const sayTyped = useCallback(async () => {
+    const text = typed.trim();
+    if (!text || saying) return;
+    setSaying(true);
+    setError("");
+    try {
+      const res = await fetch("/api/say", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text,
+          language: target,
+          voiceId: cloneRef.current ? voiceIdRef.current : null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Could not say that.");
+        return;
+      }
+      if (data.audio && audioRef.current) {
+        audioRef.current.src = data.audio;
+        audioRef.current.play().catch(() => {});
+      }
+    } catch {
+      setError("Network error.");
+    } finally {
+      setSaying(false);
+    }
+  }, [typed, saying, target]);
 
   const replay = () => {
     if (result?.audio && audioRef.current) {
@@ -470,6 +529,37 @@ export default function Home() {
             </div>
           </div>
         )}
+        <div className="sayrow">
+          <input
+            className="sayinput"
+            placeholder={
+              clone && speakers.find((sp) => sp.id === activeId)?.voiceId
+                ? `Type \u2014 ${
+                    speakers.find((sp) => sp.id === activeId)?.name
+                  }'s voice says it\u2026`
+                : "Type something to speak\u2026"
+            }
+            value={typed}
+            maxLength={600}
+            disabled={recording || working}
+            onChange={(e) => setTyped(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") sayTyped();
+            }}
+          />
+          <button
+            type="button"
+            className="saybtn"
+            disabled={!typed.trim() || saying || recording || working}
+            onClick={() => {
+              unlockAudio();
+              sayTyped();
+            }}
+          >
+            {saying ? "…" : "Say"}
+          </button>
+        </div>
+
         <button
           type="button"
           role="switch"
@@ -497,6 +587,7 @@ export default function Home() {
           onPointerDown={(e) => {
             e.preventDefault();
             e.currentTarget.setPointerCapture?.(e.pointerId);
+            unlockAudio();
             start();
           }}
           onPointerUp={(e) => {
@@ -671,6 +762,30 @@ export default function Home() {
           font-size: 13px;
         }
         .dock { display: grid; gap: 10px; }
+        .sayrow { display: flex; gap: 6px; }
+        .sayinput {
+          flex: 1;
+          min-width: 0;
+          background: #12161f;
+          color: #eef1f6;
+          border: 1px solid #26303f;
+          border-radius: 12px;
+          padding: 11px 13px;
+          font-size: 14px;
+          font-family: inherit;
+        }
+        .sayinput::placeholder { color: #5d6980; }
+        .sayinput:disabled { opacity: 0.5; }
+        .saybtn {
+          border: 1px solid #2f5480;
+          background: #15202e;
+          color: #6ea8ff;
+          border-radius: 12px;
+          padding: 0 16px;
+          font-size: 14px;
+          font-weight: 600;
+        }
+        .saybtn:disabled { opacity: 0.4; }
         .speakers { display: grid; gap: 6px; }
         .speakerlabel {
           font-size: 11px;
