@@ -446,8 +446,14 @@ export default function Home() {
           <div className="workwrap">
             <div className="spinner" aria-label="Translating" />
             <p className="worknote">
-              {clone && elapsed > 4
-                ? `Cloning the voice\u2026 ${elapsed}s`
+              {clone &&
+              elapsed > 4 &&
+              !speakers.find((sp) => sp.id === activeId)?.voiceId
+                ? `Learning ${
+                    speakers.find((sp) => sp.id === activeId)?.name || "the"
+                  }'s voice\u2026 ${elapsed}s`
+                : elapsed > 4
+                ? `Translating\u2026 ${elapsed}s`
                 : "Translating\u2026"}
             </p>
           </div>
