@@ -13,7 +13,7 @@ export default function Home() {
   const [error, setError] = useState("");
   const [elapsed, setElapsed] = useState(0);
   const [target, setTarget] = useState("English");
-  const [clone, setClone] = useState(false);
+  const [clone, setClone] = useState(true); // on by default for new visitors
   const [speakers, setSpeakers] = useState([
     { id: "s1", name: "Speaker 1", voiceId: null },
   ]);
@@ -32,7 +32,7 @@ export default function Home() {
   const tickRef = useRef(null);
   const targetRef = useRef("English");
   const stopRef = useRef(null);
-  const cloneRef = useRef(false);
+  const cloneRef = useRef(true);
   const voiceIdRef = useRef(null); // cached voice of the active speaker
   const activeIdRef = useRef("s1");
   const speakersRef = useRef([]);
@@ -42,9 +42,14 @@ export default function Home() {
     try {
       const saved = localStorage.getItem("target");
       if (saved && LANGUAGES.some((l) => l.name === saved)) setTarget(saved);
-      const savedClone = localStorage.getItem("clone") === "1";
-      setClone(savedClone);
-      cloneRef.current = savedClone;
+      const storedClone = localStorage.getItem("clone");
+      if (storedClone !== null) {
+        const savedClone = storedClone === "1";
+        setClone(savedClone);
+        cloneRef.current = savedClone;
+      } else {
+        cloneRef.current = true;
+      }
       const savedSpeakers = localStorage.getItem("speakers");
       if (savedSpeakers) {
         const parsed = JSON.parse(savedSpeakers);
