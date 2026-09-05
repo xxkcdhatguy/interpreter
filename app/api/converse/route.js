@@ -7,7 +7,15 @@ import {
   speakWithVoice,
 } from "../../../lib/voice";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Constructed lazily: instantiating at module scope makes the build fail,
+// since Next evaluates route modules before env vars are available.
+let _openai;
+function openaiClient() {
+  if (!_openai) {
+    _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return _openai;
+}
 
 const LANG_NAMES = new Intl.DisplayNames(["en"], { type: "language" });
 
@@ -62,7 +70,7 @@ export async function POST(request) {
     const file = new File([audio], "speech.webm", {
       type: audio.type || "audio/webm",
     });
-    const transcription = await openai.audio.transcriptions.create({
+    const transcription = await openaiClient().audio.transcriptions.create({
       file,
       model: "whisper-1",
       response_format: "verbose_json",
@@ -98,7 +106,7 @@ export async function POST(request) {
     const targetLang = side === "A" ? langB : langA;
     const reuseVoiceId = side === "A" ? voiceIdA : voiceIdB;
 
-    const completion = await openai.chat.completions.create({
+    const completion = await openaiClient().chat.completions.create({
       model: "gpt-4o-mini",
       temperature: 0.2,
       messages: [
@@ -149,7 +157,7 @@ export async function POST(request) {
     }
 
     if (!speechBuffer) {
-      const speech = await openai.audio.speech.create({
+      const speech = await openaiClient().audio.speech.create({
         model: "gpt-4o-mini-tts",
         voice: "alloy",
         input: translated,

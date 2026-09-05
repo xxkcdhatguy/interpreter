@@ -5,7 +5,15 @@ import {
   speakWithVoice,
 } from "../../../lib/voice";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Constructed lazily: instantiating at module scope makes the build fail,
+// since Next evaluates route modules before env vars are available.
+let _openai;
+function openaiClient() {
+  if (!_openai) {
+    _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return _openai;
+}
 
 /**
  * Re-translate an existing turn into another language, without re-recording.
@@ -30,7 +38,7 @@ export async function POST(request) {
   }
 
   try {
-    const completion = await openai.chat.completions.create({
+    const completion = await openaiClient().chat.completions.create({
       model: "gpt-4o-mini",
       temperature: 0.2,
       messages: [
@@ -67,7 +75,7 @@ export async function POST(request) {
     }
 
     if (!speechBuffer) {
-      const speech = await openai.audio.speech.create({
+      const speech = await openaiClient().audio.speech.create({
         model: "gpt-4o-mini-tts",
         voice: "alloy",
         input: translated,
