@@ -119,6 +119,7 @@ export default function Home() {
         tickRef.current = null;
       }
       data.producedIn = targetLang;
+      if (data.voiceNote) setError(data.voiceNote);
       if (data.voiceId) {
         voiceIdRef.current = data.voiceId;
         const who = activeIdRef.current;
@@ -514,11 +515,17 @@ export default function Home() {
                 className="chip add"
                 disabled={recording || working || speakers.length >= 6}
                 onClick={() => {
+                  // Lowest unused number, so deleting a speaker cannot
+                  // produce a duplicate name.
+                  let n = speakers.length + 1;
+                  const taken = new Set(speakers.map((x) => x.name));
+                  while (taken.has(`Speaker ${n}`)) n += 1;
+                  const suggested = `Speaker ${n}`;
+                  const entered = window.prompt("Who is speaking?", suggested);
+                  if (entered === null) return; // cancelled
+                  const name = entered.trim() || suggested;
                   const id = `s${Date.now()}`;
-                  setSpeakers((prev) => [
-                    ...prev,
-                    { id, name: `Speaker ${prev.length + 1}`, voiceId: null },
-                  ]);
+                  setSpeakers((prev) => [...prev, { id, name, voiceId: null }]);
                   setActiveId(id);
                   activeIdRef.current = id;
                   voiceIdRef.current = null;

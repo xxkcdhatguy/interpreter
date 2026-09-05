@@ -135,6 +135,7 @@ export async function POST(request) {
     const languageId = cloneLanguageId(targetLang);
     let speechBuffer;
     let voiceMode = "stock";
+    let voiceNote = null;
     let voiceId = null;
 
     if (wantsClone && cloningEnabled() && languageId) {
@@ -160,6 +161,7 @@ export async function POST(request) {
         voiceMode = "cloned";
       } catch (err) {
         console.warn("clone failed, using stock voice:", err.message);
+        voiceNote = "Couldn't clone that voice — used the standard one.";
       }
     }
 
@@ -180,6 +182,7 @@ export async function POST(request) {
       side,
       targetLang,
       voiceMode,
+      voiceNote,
       voiceId,
       audio: `data:audio/mp3;base64,${speechBuffer.toString("base64")}`,
     });

@@ -126,6 +126,7 @@ export async function POST(request) {
     //    stock voice if cloning is unavailable or fails for this clip.
     let speechBuffer;
     let voiceMode = "stock";
+    let voiceNote = null;
     let mime = "audio/mp3";
     const languageId = cloneLanguageId(targetLang);
 
@@ -155,6 +156,7 @@ export async function POST(request) {
         mime = "audio/mp3";
       } catch (cloneErr) {
         console.warn("voice clone failed, using stock voice:", cloneErr.message);
+        voiceNote = "Couldn't clone that voice — used the standard one.";
       }
     }
 
@@ -174,6 +176,7 @@ export async function POST(request) {
       translated,
       detectedLanguage: detectedName,
       voiceMode,
+      voiceNote,
       voiceId,
       audio: `data:${mime};base64,${speechBuffer.toString("base64")}`,
     });
