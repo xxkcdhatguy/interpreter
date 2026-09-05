@@ -20,6 +20,8 @@ export default function Home() {
   const [activeId, setActiveId] = useState("s1");
   const [alt, setAlt] = useState(null); // { target, translated } re-translation
   const [altBusy, setAltBusy] = useState(null); // language being fetched
+  const [needsName, setNeedsName] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
   const [typed, setTyped] = useState("");
   const [saying, setSaying] = useState(false);
 
@@ -51,12 +53,13 @@ export default function Home() {
         cloneRef.current = true;
       }
       const savedSpeakers = localStorage.getItem("speakers");
-      if (savedSpeakers) {
-        const parsed = JSON.parse(savedSpeakers);
-        if (Array.isArray(parsed) && parsed.length) {
-          setSpeakers(parsed);
-          setActiveId(parsed[0].id);
-        }
+      const parsed = savedSpeakers ? JSON.parse(savedSpeakers) : null;
+      if (Array.isArray(parsed) && parsed.length) {
+        setSpeakers(parsed);
+        setActiveId(parsed[0].id);
+      } else {
+        // First visit on this device: ask who this is before recording.
+        setNeedsName(true);
       }
     } catch {}
   }, []);
@@ -341,6 +344,16 @@ export default function Home() {
     }
   }, [typed, saying, target]);
 
+  const confirmName = useCallback(() => {
+    const name = nameDraft.trim();
+    if (!name) return;
+    setSpeakers([{ id: "s1", name, voiceId: null }]);
+    setActiveId("s1");
+    activeIdRef.current = "s1";
+    voiceIdRef.current = null;
+    setNeedsName(false);
+  }, [nameDraft]);
+
   const replay = () => {
     if (result?.audio && audioRef.current) {
       audioRef.current.currentTime = 0;
@@ -387,6 +400,37 @@ export default function Home() {
           </select>
         </label>
       </header>
+
+      {needsName && (
+        <div className="namegate" role="dialog" aria-label="Your name">
+          <div className="namecard">
+            <h2>Who&apos;s using this?</h2>
+            <p>
+              We&apos;ll save your voice under this name so it sounds like you
+              next time.
+            </p>
+            <input
+              autoFocus
+              className="nameentry"
+              placeholder="Your name"
+              value={nameDraft}
+              maxLength={20}
+              onChange={(e) => setNameDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") confirmName();
+              }}
+            />
+            <button
+              type="button"
+              className="namego"
+              disabled={!nameDraft.trim()}
+              onClick={confirmName}
+            >
+              Start
+            </button>
+          </div>
+        </div>
+      )}
 
       <section className="stage" aria-live="polite">
         {status === "idle" && !error && (
@@ -774,6 +818,57 @@ export default function Home() {
           font-size: 13px;
         }
         .dock { display: grid; gap: 10px; }
+        .namegate {
+          position: fixed;
+          inset: 0;
+          z-index: 50;
+          background: rgba(6, 8, 12, 0.88);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 24px;
+        }
+        .namecard {
+          width: 100%;
+          max-width: 330px;
+          background: #12161f;
+          border: 1px solid #26303f;
+          border-radius: 20px;
+          padding: 22px;
+          display: grid;
+          gap: 12px;
+        }
+        .namecard h2 {
+          margin: 0;
+          font-size: 19px;
+          letter-spacing: -0.01em;
+        }
+        .namecard p {
+          margin: 0;
+          color: #8d97a8;
+          font-size: 13.5px;
+          line-height: 1.45;
+        }
+        .nameentry {
+          background: #0e1219;
+          color: #eef1f6;
+          border: 1px solid #2b3444;
+          border-radius: 12px;
+          padding: 13px 14px;
+          font-size: 16px;
+          font-family: inherit;
+        }
+        .nameentry::placeholder { color: #5d6980; }
+        .namego {
+          border: none;
+          border-radius: 12px;
+          padding: 14px;
+          background: #2563eb;
+          color: #fff;
+          font-size: 15px;
+          font-weight: 600;
+        }
+        .namego:disabled { background: #2a3140; color: #7c879b; }
         .sayrow { display: flex; gap: 6px; }
         .sayinput {
           flex: 1;
