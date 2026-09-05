@@ -17,7 +17,9 @@ function openaiClient() {
 
 // Portuguese means Brazilian Portuguese in this app.
 function promptLanguage(name) {
-  return name === "Portuguese" ? "Brazilian Portuguese (pt-BR)" : name;
+  if (name === "Portuguese") return "Brazilian Portuguese (pt-BR)";
+  if (name === "Austrian German") return "German as spoken in Austria";
+  return name;
 }
 
 /**
