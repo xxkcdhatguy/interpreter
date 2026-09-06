@@ -48,12 +48,14 @@ export async function POST(request) {
   let targetLang = "English";
   let wantsClone = false;
   let reuseVoiceId = null;
+  let speakerName = null;
   try {
     const form = await request.formData();
     audio = form.get("audio");
     targetLang = form.get("target") || "English";
     wantsClone = form.get("clone") === "1";
     reuseVoiceId = form.get("voiceId") || null;
+    speakerName = form.get("speakerName") || null;
   } catch {
     return Response.json({ error: "Malformed request." }, { status: 400 });
   }
@@ -148,6 +150,7 @@ export async function POST(request) {
             text: translated,
             languageId,
             sourceLangCode: sourceLanguageId(detected),
+            speakerName,
           });
           speechBuffer = out.audio;
           voiceId = out.voiceId;

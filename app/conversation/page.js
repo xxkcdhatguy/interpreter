@@ -29,17 +29,21 @@ export default function Conversation() {
 
   // Each side keeps its own cloned voice, so only the first turn per person
   // pays the cloning cost.
+  const nameARef = useRef("Me");
+  const nameBRef = useRef("Them");
   const voiceA = useRef(null);
   const voiceB = useRef(null);
   const cfg = useRef({ langA, langB, clone, side: null });
 
   useEffect(() => {
     cfg.current = { ...cfg.current, langA, langB, clone };
+    nameARef.current = nameA;
+    nameBRef.current = nameB;
     if (!clone) {
       voiceA.current = null;
       voiceB.current = null;
     }
-  }, [langA, langB, clone]);
+  }, [langA, langB, clone, nameA, nameB]);
 
   useEffect(() => {
     audioRef.current = new Audio();
@@ -102,6 +106,8 @@ export default function Conversation() {
     form.append("langB", b);
     form.append("clone", useClone ? "1" : "0");
     if (forcedSide) form.append("side", forcedSide);
+    const who = forcedSide === "B" ? nameBRef.current : nameARef.current;
+    if (who) form.append("speakerName", who);
     if (voiceA.current) form.append("voiceIdA", voiceA.current);
     if (voiceB.current) form.append("voiceIdB", voiceB.current);
 

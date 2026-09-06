@@ -113,6 +113,9 @@ export default function Home() {
     if (useClone && voiceIdRef.current) {
       form.append("voiceId", voiceIdRef.current);
     }
+    // Name the clone after the speaker so it is identifiable in Cartesia.
+    const who = speakersRef.current.find((sp) => sp.id === activeIdRef.current);
+    if (who?.name) form.append("speakerName", who.name);
     try {
       const res = await fetch("/api/translate", { method: "POST", body: form });
       const data = await res.json();
