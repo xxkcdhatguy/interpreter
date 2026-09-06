@@ -31,6 +31,7 @@ export default function Home() {
   const startedAtRef = useRef(0);
   const audioRef = useRef(null);
   const unlockedRef = useRef(false);
+  const warmStreamRef = useRef(null);
   const tickRef = useRef(null);
   const targetRef = useRef("English");
   const stopRef = useRef(null);
@@ -44,14 +45,23 @@ export default function Home() {
     try {
       const saved = localStorage.getItem("target");
       if (saved && LANGUAGES.some((l) => l.name === saved)) setTarget(saved);
+      // Preferences saved before cloning defaulted to on would pin it off
+      // forever. Honour an off choice only if it was made since that change.
       const storedClone = localStorage.getItem("clone");
-      if (storedClone !== null) {
+      const choiceIsCurrent = localStorage.getItem("cloneDefaultOn") === "1";
+      if (storedClone !== null && choiceIsCurrent) {
         const savedClone = storedClone === "1";
         setClone(savedClone);
         cloneRef.current = savedClone;
       } else {
         cloneRef.current = true;
+        try {
+          localStorage.setItem("clone", "1");
+        } catch {}
       }
+      try {
+        localStorage.setItem("cloneDefaultOn", "1");
+      } catch {}
       const savedSpeakers = localStorage.getItem("speakers");
       const parsed = savedSpeakers ? JSON.parse(savedSpeakers) : null;
       if (Array.isArray(parsed) && parsed.length) {
@@ -69,11 +79,24 @@ export default function Home() {
     return () => {
       if (tickRef.current) clearInterval(tickRef.current);
       streamRef.current?.getTracks().forEach((t) => t.stop());
+      warmStreamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, []);
 
   // Safari/iOS block programmatic playback unless the element has already
   // played once from a user gesture. Prime it during the press.
+  // Acquiring the mic takes a few hundred ms; doing it inside the press means
+  // the start of the sentence is never recorded. Warm it up beforehand and
+  // reuse the stream.
+  const warmMic = useCallback(async () => {
+    if (warmStreamRef.current?.active) return warmStreamRef.current;
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true },
+    });
+    warmStreamRef.current = stream;
+    return stream;
+  }, []);
+
   const unlockAudio = useCallback(() => {
     if (unlockedRef.current || !audioRef.current) return;
     const el = audioRef.current;
@@ -159,9 +182,9 @@ export default function Home() {
     setResult(null);
     setAlt(null);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true },
-      });
+      const stream = warmStreamRef.current?.active
+        ? warmStreamRef.current
+        : await warmMic();
       streamRef.current = stream;
 
       const mime = MediaRecorder.isTypeSupported("audio/webm")
@@ -175,7 +198,7 @@ export default function Home() {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
       rec.onstop = () => {
-        streamRef.current?.getTracks().forEach((t) => t.stop());
+        // Keep the stream alive so the next press records instantly.
         streamRef.current = null;
         const held = Date.now() - startedAtRef.current;
         const blob = new Blob(chunksRef.current, {
@@ -205,7 +228,7 @@ export default function Home() {
       );
       setStatus("error");
     }
-  }, [status, send]);
+  }, [status, send, warmMic]);
 
   const stop = useCallback(() => {
     if (tickRef.current) {
@@ -355,7 +378,8 @@ export default function Home() {
     activeIdRef.current = "s1";
     voiceIdRef.current = null;
     setNeedsName(false);
-  }, [nameDraft]);
+    warmMic().catch(() => {});
+  }, [nameDraft, warmMic]);
 
   const replay = () => {
     if (result?.audio && audioRef.current) {
