@@ -1,5 +1,10 @@
 import OpenAI from "openai";
 import {
+  geminiEnabled,
+  looksUnrecognised,
+  transcribeWithGemini,
+} from "../../../lib/gemini";
+import {
   cloneLanguageId,
   cloningEnabled,
   sourceLanguageId,
@@ -80,6 +85,17 @@ export async function POST(request) {
 
     // Whisper invents filler text ("you", "Thank you.") for silent or noise-only
     // audio. Reject it here so we never speak a hallucination out loud.
+    // Whisper mangles languages it does not know (Xitsonga, siSwati...) into
+    // confident-sounding gibberish. When its confidence is low, let Gemini try.
+    let geminiResult = null;
+    if (geminiEnabled() && looksUnrecognised(transcription)) {
+      geminiResult = await transcribeWithGemini({
+        audioBuffer: Buffer.from(await audio.arrayBuffer()),
+        mimeType: audio.type || "audio/webm",
+        targetLang,
+      });
+    }
+
     const segments = transcription.segments || [];
     const noSpeechish =
       segments.length > 0 &&
@@ -88,7 +104,9 @@ export async function POST(request) {
       );
     const tooShortToBeReal = sourceText.replace(/[^\p{L}\p{N}]/gu, "").length < 2;
 
-    if (!sourceText || noSpeechish || tooShortToBeReal) {
+    if (geminiResult) {
+      // Gemini understood it; skip the Whisper-derived text entirely.
+    } else if (!sourceText || noSpeechish || tooShortToBeReal) {
       return Response.json(
         {
           error:
@@ -98,13 +116,15 @@ export async function POST(request) {
       );
     }
 
-    // 2. Translate. Skip the round trip when it is already the target language.
-    const detectedName = languageName(detected);
+    // 2. Translate. Skip the round trip when it is already the target
+    //    language, or when Gemini already returned a translation.
+    const finalSource = geminiResult ? geminiResult.transcript : sourceText;
+    const detectedName = geminiResult?.language || languageName(detected);
     const alreadyTarget =
       detectedName.toLowerCase() === targetLang.toLowerCase();
 
-    let translated = sourceText;
-    if (!alreadyTarget) {
+    let translated = geminiResult?.translation || finalSource;
+    if (!geminiResult && !alreadyTarget) {
       const completion = await openaiClient().chat.completions.create({
         model: "gpt-4o-mini",
         temperature: 0.2,
@@ -117,11 +137,11 @@ export async function POST(request) {
               `Keep the speaker's tone and register — translate casual speech casually. ` +
               `Preserve names, numbers and units exactly. If the text is already in ${promptLanguage(targetLang)}, return it unchanged.`,
           },
-          { role: "user", content: sourceText },
+          { role: "user", content: finalSource },
         ],
       });
       translated =
-        completion.choices[0]?.message?.content?.trim() || sourceText;
+        completion.choices[0]?.message?.content?.trim() || finalSource;
     }
 
     // 3. Text -> speech. Prefer the speaker's own cloned voice; fall back to a
@@ -175,9 +195,10 @@ export async function POST(request) {
     }
 
     return Response.json({
-      sourceText,
+      sourceText: finalSource,
       translated,
       detectedLanguage: detectedName,
+      transcriber: geminiResult ? "gemini" : "whisper",
       voiceMode,
       voiceNote,
       voiceId,
